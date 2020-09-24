@@ -19,11 +19,11 @@
     <parent>
         <groupId>com.ifi</groupId>
         <artifactId>nifi-csv-bundle</artifactId>
-        <version>1.0-SNAPSHOT</version>
+        <version>1.0</version>
     </parent>
 
     <artifactId>nifi-csv-nar</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>1.0</version>
     <packaging>nar</packaging>
     <properties>
         <maven.javadoc.skip>true</maven.javadoc.skip>
@@ -34,7 +34,7 @@
         <dependency>
             <groupId>com.ifi</groupId>
             <artifactId>nifi-csv-processors</artifactId>
-            <version>1.0-SNAPSHOT</version>
+            <version>1.0</version>
         </dependency>
     </dependencies>
 
