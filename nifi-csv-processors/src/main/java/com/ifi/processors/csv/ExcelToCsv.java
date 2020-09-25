@@ -32,20 +32,24 @@ import org.apache.nifi.processor.ProcessContext;
 import org.apache.nifi.processor.ProcessSession;
 import org.apache.nifi.processor.ProcessorInitializationContext;
 import org.apache.nifi.processor.Relationship;
+import org.apache.nifi.processor.io.InputStreamCallback;
 import org.apache.nifi.processor.util.StandardValidators;
+import org.apache.nifi.stream.io.StreamUtils;
 
+import java.io.*;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Tags({"example"})
 @CapabilityDescription("Provide a description")
 @SeeAlso({})
-@ReadsAttributes({@ReadsAttribute(attribute="", description="")})
-@WritesAttributes({@WritesAttribute(attribute="", description="")})
-public class MyProcessor extends AbstractProcessor {
+@ReadsAttributes({@ReadsAttribute(attribute = "", description = "")})
+@WritesAttributes({@WritesAttribute(attribute = "", description = "")})
+public class ExcelToCsv extends AbstractProcessor {
 
     public static final PropertyDescriptor MY_PROPERTY = new PropertyDescriptor
             .Builder().name("MY_PROPERTY")
@@ -93,9 +97,18 @@ public class MyProcessor extends AbstractProcessor {
     @Override
     public void onTrigger(final ProcessContext context, final ProcessSession session) throws ProcessException {
         FlowFile flowFile = session.get();
-        if ( flowFile == null ) {
+        if (flowFile == null) {
             return;
         }
-        // TODO implement
+        final AtomicReference<String> contents = new AtomicReference<>(null);
+        final byte[] bytebuffer = new byte[(int) flowFile.getSize()];
+        session.read(flowFile, new InputStreamCallback() {
+            @Override
+            public void process(InputStream inputStream) throws IOException {
+                StreamUtils.fillBuffer(inputStream, bytebuffer, true);
+                contents.set(bytebuffer.toString());
+            }
+        });
+        System.out.println(contents.get());
     }
 }
