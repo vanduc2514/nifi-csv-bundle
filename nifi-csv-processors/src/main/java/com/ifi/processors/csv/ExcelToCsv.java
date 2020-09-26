@@ -16,52 +16,46 @@
  */
 package com.ifi.processors.csv;
 
-import org.apache.nifi.components.PropertyDescriptor;
-import org.apache.nifi.flowfile.FlowFile;
 import org.apache.nifi.annotation.behavior.ReadsAttribute;
 import org.apache.nifi.annotation.behavior.ReadsAttributes;
 import org.apache.nifi.annotation.behavior.WritesAttribute;
 import org.apache.nifi.annotation.behavior.WritesAttributes;
-import org.apache.nifi.annotation.lifecycle.OnScheduled;
 import org.apache.nifi.annotation.documentation.CapabilityDescription;
 import org.apache.nifi.annotation.documentation.SeeAlso;
 import org.apache.nifi.annotation.documentation.Tags;
+import org.apache.nifi.annotation.lifecycle.OnScheduled;
+import org.apache.nifi.components.PropertyDescriptor;
+import org.apache.nifi.flowfile.FlowFile;
+import org.apache.nifi.logging.ComponentLog;
+import org.apache.nifi.processor.*;
 import org.apache.nifi.processor.exception.ProcessException;
-import org.apache.nifi.processor.AbstractProcessor;
-import org.apache.nifi.processor.ProcessContext;
-import org.apache.nifi.processor.ProcessSession;
-import org.apache.nifi.processor.ProcessorInitializationContext;
-import org.apache.nifi.processor.Relationship;
-import org.apache.nifi.processor.io.InputStreamCallback;
-import org.apache.nifi.processor.util.StandardValidators;
-import org.apache.nifi.stream.io.StreamUtils;
 
-import java.io.*;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.concurrent.atomic.AtomicReference;
+import java.io.ByteArrayOutputStream;
+import java.util.*;
 
-@Tags({"example"})
-@CapabilityDescription("Provide a description")
-@SeeAlso({})
+@Tags({"excel, csv"})
+@CapabilityDescription("Processor to convert Excel to CSV")
+@SeeAlso()
 @ReadsAttributes({@ReadsAttribute(attribute = "", description = "")})
 @WritesAttributes({@WritesAttribute(attribute = "", description = "")})
 public class ExcelToCsv extends AbstractProcessor {
+    private ComponentLog logger;
+//    public static final PropertyDescriptor PROCESSOR_PROPERTY = new PropertyDescriptor
+//            .Builder().name("MY_PROPERTY")
+//            .displayName("My property")
+//            .description("Example Property")
+//            .required(true)
+//            .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+//            .build();
 
-    public static final PropertyDescriptor MY_PROPERTY = new PropertyDescriptor
-            .Builder().name("MY_PROPERTY")
-            .displayName("My property")
-            .description("Example Property")
-            .required(true)
-            .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+    public static final Relationship SUCCESS = new Relationship.Builder()
+            .name("success")
+            .description("Excel files that have been successfully converted to CSV are transferred to this relationship")
             .build();
 
-    public static final Relationship MY_RELATIONSHIP = new Relationship.Builder()
-            .name("MY_RELATIONSHIP")
-            .description("Example relationship")
+    public static final Relationship FAILURE = new Relationship.Builder()
+            .name("failure")
+            .description("Excel files that can't be converted to CSV are transferred to this relationship")
             .build();
 
     private List<PropertyDescriptor> descriptors;
@@ -70,12 +64,13 @@ public class ExcelToCsv extends AbstractProcessor {
 
     @Override
     protected void init(final ProcessorInitializationContext context) {
-        final List<PropertyDescriptor> descriptors = new ArrayList<>();
-        descriptors.add(MY_PROPERTY);
-        this.descriptors = Collections.unmodifiableList(descriptors);
+//        final List<PropertyDescriptor> descriptors = new ArrayList<>();
+//        descriptors.add(PROCESSOR_PROPERTY);
+//        this.descriptors = Collections.unmodifiableList(descriptors);
 
         final Set<Relationship> relationships = new HashSet<>();
-        relationships.add(MY_RELATIONSHIP);
+        relationships.add(SUCCESS);
+        relationships.add(FAILURE);
         this.relationships = Collections.unmodifiableSet(relationships);
     }
 
@@ -91,24 +86,21 @@ public class ExcelToCsv extends AbstractProcessor {
 
     @OnScheduled
     public void onScheduled(final ProcessContext context) {
-
+        logger = getLogger();
+        logger.info("Processor Started!");
     }
 
     @Override
     public void onTrigger(final ProcessContext context, final ProcessSession session) throws ProcessException {
+        logger.info("Processor Triggered!");
         FlowFile flowFile = session.get();
         if (flowFile == null) {
             return;
         }
-        final AtomicReference<String> contents = new AtomicReference<>(null);
-        final byte[] bytebuffer = new byte[(int) flowFile.getSize()];
-        session.read(flowFile, new InputStreamCallback() {
-            @Override
-            public void process(InputStream inputStream) throws IOException {
-                StreamUtils.fillBuffer(inputStream, bytebuffer, true);
-                contents.set(bytebuffer.toString());
-            }
-        });
-        System.out.println(contents.get());
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        session.exportTo(flowFile, outputStream);
+        final byte[] bytebuffer = outputStream.toByteArray();
+        logger.info(Arrays.toString(bytebuffer));
+        session.transfer(flowFile, SUCCESS);
     }
 }
