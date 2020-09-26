@@ -29,8 +29,12 @@ import org.apache.nifi.flowfile.FlowFile;
 import org.apache.nifi.logging.ComponentLog;
 import org.apache.nifi.processor.*;
 import org.apache.nifi.processor.exception.ProcessException;
+import org.apache.nifi.processor.io.InputStreamCallback;
+import org.apache.poi.util.IOUtils;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.*;
 
 @Tags({"excel, csv"})
@@ -97,10 +101,14 @@ public class ExcelToCsv extends AbstractProcessor {
         if (flowFile == null) {
             return;
         }
-        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        session.exportTo(flowFile, outputStream);
-        final byte[] bytebuffer = outputStream.toByteArray();
-        logger.info(Arrays.toString(bytebuffer));
+        session.read(flowFile, new InputStreamCallback() {
+            @Override
+            public void process(InputStream inputStream) throws IOException {
+                System.out.println(inputStream);
+                byte[] bytes = IOUtils.toByteArray(inputStream);
+                logger.info(Arrays.toString(bytes));
+            }
+        });
         session.transfer(flowFile, SUCCESS);
     }
 }
