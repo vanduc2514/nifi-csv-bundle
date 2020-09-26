@@ -6,12 +6,12 @@ import java.io.IOException;
 import java.io.InputStream;
 
 public class CSVConverterImp implements CSVConverter {
-    private static final Object EXCEL_STYLE_ESCAPING = ""; //TODO
+    private static final int EXCEL_STYLE_ESCAPING = 0; //TODO
     private String delimiter = ",";
     private String asNullValue = "";
     private FormulaEvaluator evaluator;
     private DataFormatter formatter;
-    private Object formattingConvention; //TODO
+    private int formattingConvention = 0; //TODO
 
     public CSVConverterImp() {
     }
