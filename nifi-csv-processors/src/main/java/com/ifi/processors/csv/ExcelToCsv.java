@@ -104,9 +104,6 @@ public class ExcelToCsv extends AbstractProcessor {
         session.read(flowFile, new InputStreamCallback() {
             @Override
             public void process(InputStream inputStream) throws IOException {
-                System.out.println(inputStream);
-                byte[] bytes = IOUtils.toByteArray(inputStream);
-                logger.info(Arrays.toString(bytes));
             }
         });
         session.transfer(flowFile, SUCCESS);
