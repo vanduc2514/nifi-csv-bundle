@@ -35,6 +35,7 @@ import org.apache.nifi.flowfile.attributes.CoreAttributes;
 import org.apache.nifi.logging.ComponentLog;
 import org.apache.nifi.processor.*;
 import org.apache.nifi.processor.exception.ProcessException;
+import org.apache.nifi.processor.util.StandardValidators;
 import org.apache.nifi.util.StringUtils;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
@@ -53,6 +54,8 @@ public class ExcelToCsv extends AbstractProcessor {
 
     static final String UNIX_SYSTEM = "Unix";
     static final String WINDOWS_SYSTEM = "Windows";
+    static final String SHEET_NAME_DELIMITER = ",";
+
     static final String CSV_MIME_TYPE = "text/csv";
     static final String SHEET_NAME_SEPARATOR = "-";
     static final String CSV_EXTENSION = ".csv";
@@ -64,6 +67,7 @@ public class ExcelToCsv extends AbstractProcessor {
     private ComponentLog logger;
     private CSVConverter converter;
     private boolean utf8Encoded;
+    private String[] extractSheets;
 
     public static final PropertyDescriptor UTF8_ENCODED = new PropertyDescriptor
             .Builder().name("utf8-encoded")
@@ -88,7 +92,18 @@ public class ExcelToCsv extends AbstractProcessor {
             .displayName("Delimiter")
             .description("Delimiter use in csv")
             .defaultValue(",")
+            .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
             .required(true)
+            .build();
+
+    public static final PropertyDescriptor EXTRACT_SHEETS = new PropertyDescriptor
+            .Builder().name("extract-sheets")
+            .displayName("Sheets to Extract")
+            .description("Comma separated list of Excel document sheet names that should be extracted from the excel document. If this property" +
+                    " is left blank then all of the sheets will be extracted from the Excel document. The list of names is case in-sensitive. Any sheets not " +
+                    "specified in this value will be ignored.")
+            .required(false)
+            .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
             .build();
 
     public static final Relationship SUCCESS = new Relationship.Builder()
@@ -112,6 +127,7 @@ public class ExcelToCsv extends AbstractProcessor {
         descriptors.add(UTF8_ENCODED);
         descriptors.add(ESCAPE_CONVENTION);
         descriptors.add(DELIMITER);
+        descriptors.add(EXTRACT_SHEETS);
         this.descriptors = Collections.unmodifiableList(descriptors);
 
         final Set<Relationship> relationships = new HashSet<>();
@@ -136,6 +152,9 @@ public class ExcelToCsv extends AbstractProcessor {
         logger = getLogger();
         logger.info("Processor Started!");
         utf8Encoded = context.getProperty(UTF8_ENCODED).asBoolean();
+        if (context.getProperty(EXTRACT_SHEETS) != null) {
+            extractSheets = context.getProperty(EXTRACT_SHEETS).getValue().split(SHEET_NAME_DELIMITER);
+        }
         setupConverter(context);
     }
 
@@ -160,10 +179,24 @@ public class ExcelToCsv extends AbstractProcessor {
         session.read(excelFile, inputStream -> {
             try {
                 Workbook workbook = converter.createWorkbook(inputStream);
-                for (int i = 0; i < workbook.getNumberOfSheets(); i++) {
-                    Sheet sheet = workbook.getSheetAt(i);
-                    String csvData = converter.toCSVFormat(sheet);
-                    handleCSVData(session, excelFile, sheet, csvData);
+                if (extractSheets != null) {
+                    for (String sheetName : extractSheets) {
+                        Sheet sheet = workbook.getSheet(sheetName);
+                        if (sheet != null) {
+                            handleCSVData(session, excelFile, sheet);
+                        } else {
+                            session.transfer(excelFile, FAILURE);
+                        }
+                    }
+                } else {
+                    for (int i = 0; i < workbook.getNumberOfSheets(); i++) {
+                        Sheet sheet = workbook.getSheetAt(i);
+                        if (sheet != null) {
+                            handleCSVData(session, excelFile, sheet);
+                        } else {
+                            session.transfer(excelFile, FAILURE);
+                        }
+                    }
                 }
             } catch (InvalidDocumentException e) {
                 session.transfer(excelFile, FAILURE);
@@ -171,6 +204,11 @@ public class ExcelToCsv extends AbstractProcessor {
         });
 
         session.transfer(excelFile, ORIGINAL);
+    }
+
+    private void handleCSVData(ProcessSession session, FlowFile excelFile, Sheet sheet) {
+        String csvData = converter.toCSVFormat(sheet);
+        handleCSVData(session, excelFile, sheet, csvData);
     }
 
     private void handleCSVData(ProcessSession session, FlowFile excelFile, Sheet sheet, String csvData) {
