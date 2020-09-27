@@ -19,6 +19,7 @@ package com.ifi.processors.csv;
 import com.ifi.util.CSVConverter;
 import com.ifi.util.CSVConverterImp;
 import com.ifi.util.exception.InvalidDocumentException;
+import org.apache.commons.io.FilenameUtils;
 import org.apache.nifi.annotation.behavior.ReadsAttribute;
 import org.apache.nifi.annotation.behavior.ReadsAttributes;
 import org.apache.nifi.annotation.behavior.WritesAttribute;
@@ -33,6 +34,7 @@ import org.apache.nifi.flowfile.attributes.CoreAttributes;
 import org.apache.nifi.logging.ComponentLog;
 import org.apache.nifi.processor.*;
 import org.apache.nifi.processor.exception.ProcessException;
+import org.apache.nifi.util.StringUtils;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 
@@ -54,6 +56,8 @@ public class ExcelToCsv extends AbstractProcessor {
     static final String SHEET_NAME_ATT = "sheet name";
     static final String ROW_NUM_ATT = "row num";
     static final String SOURCE_NAME_ATT = "source name";
+    static final byte[] BYTE_ORDER_MARKER = new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
+
     private ComponentLog logger;
     private CSVConverter converter;
 //    public static final PropertyDescriptor PROCESSOR_PROPERTY = new PropertyDescriptor
@@ -82,7 +86,6 @@ public class ExcelToCsv extends AbstractProcessor {
     private List<PropertyDescriptor> descriptors;
 
     private Set<Relationship> relationships;
-    static final byte[] BYTE_ORDER_MARKER = new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
 
     @Override
     protected void init(final ProcessorInitializationContext context) {
@@ -137,12 +140,15 @@ public class ExcelToCsv extends AbstractProcessor {
                         printStream.close();
                     });
 
-                    String sourceName = excelFile.getAttribute(CoreAttributes.FILENAME.key());
+                    String sourceFileName = excelFile.getAttribute(CoreAttributes.FILENAME.key());
                     csvFile = session.putAttribute(csvFile, SHEET_NAME_ATT, sheet.getSheetName());
                     csvFile = session.putAttribute(csvFile, ROW_NUM_ATT, String.valueOf(sheet.getPhysicalNumberOfRows()));
-                    csvFile = session.putAttribute(csvFile, SOURCE_NAME_ATT, sourceName);
+                    csvFile = session.putAttribute(csvFile, SOURCE_NAME_ATT, sourceFileName);
                     csvFile = session.putAttribute(csvFile, CoreAttributes.MIME_TYPE.key(), CSV_MIME_TYPE);
-                    csvFile = session.putAttribute(csvFile, CoreAttributes.FILENAME.key(), getCSVFileName(sheet.getSheetName(), sourceName));
+                    csvFile = session.putAttribute(csvFile, CoreAttributes.FILENAME.key(),
+                            StringUtils.isNotEmpty(sourceFileName) ?
+                                    getCSVFileName(sourceFileName, sheet.getSheetName()) :
+                                    csvFile.getAttribute(CoreAttributes.UUID.key()) + CSV_EXTENSION);
                     session.transfer(csvFile, SUCCESS);
                 }
             } catch (InvalidDocumentException e) {
@@ -154,6 +160,16 @@ public class ExcelToCsv extends AbstractProcessor {
     }
 
     private String getCSVFileName(String sourceFileName, String sheetName) {
-        return sourceFileName.substring(0, sourceFileName.lastIndexOf(".")) + SHEET_NAME_SEPARATOR + sheetName + CSV_EXTENSION;
+        StringBuilder builder = new StringBuilder();
+        String ext = FilenameUtils.getExtension(sourceFileName);
+        if (StringUtils.isNotEmpty(ext)) {
+            builder.append(sourceFileName.replaceAll(("." + ext), ""));
+        } else {
+            builder.append(sourceFileName);
+        }
+        builder.append(SHEET_NAME_SEPARATOR);
+        builder.append(sheetName);
+        builder.append(CSV_EXTENSION);
+        return builder.toString();
     }
 }
