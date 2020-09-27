@@ -1,5 +1,8 @@
 package com.ifi.util;
 
+import com.ifi.util.exception.InvalidDocumentException;
+import org.apache.poi.EmptyFileException;
+import org.apache.poi.EncryptedDocumentException;
 import org.apache.poi.ss.usermodel.*;
 
 import java.io.IOException;
@@ -21,11 +24,15 @@ public class CSVConverterImp implements CSVConverter {
         this.asNullValue = asNullValue;
     }
 
-    public Workbook createWorkbook(InputStream inputStream) throws IOException {
-
-        Workbook workbook = WorkbookFactory.create(inputStream);
-        this.evaluator = workbook.getCreationHelper().createFormulaEvaluator();
-        this.formatter = new DataFormatter();
+    public Workbook createWorkbook(InputStream inputStream) throws IOException, InvalidDocumentException, EncryptedDocumentException {
+        Workbook workbook;
+        try {
+            workbook = WorkbookFactory.create(inputStream);
+            this.evaluator = workbook.getCreationHelper().createFormulaEvaluator();
+            this.formatter = new DataFormatter();
+        } catch (EmptyFileException exception) {
+            throw new InvalidDocumentException();
+        }
         return workbook;
     }
 
@@ -80,7 +87,7 @@ public class CSVConverterImp implements CSVConverter {
                     builder.append("\"");
                 }
             }
-            return (builder.toString().trim());
+            return builder.toString();
         } else {
             if (fieldData.contains(this.delimiter)) {
                 fieldData = fieldData.replaceAll(this.delimiter, ("\\\\" + this.delimiter));

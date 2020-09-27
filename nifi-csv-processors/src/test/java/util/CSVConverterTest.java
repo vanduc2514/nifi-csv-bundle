@@ -2,8 +2,10 @@ package util;
 
 import com.ifi.util.CSVConverter;
 import com.ifi.util.CSVConverterImp;
+import com.ifi.util.exception.InvalidDocumentException;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -29,14 +31,14 @@ public class CSVConverterTest {
         int expectedRowInFirstSheet = 501;
         String fileName = "one-sheet-no-formula-972003.xls";
         File file = new File(Objects.requireNonNull(getClass().getClassLoader().getResource(fileName)).getFile());
-        assertNotNull(file);
+
         Workbook workbook = null;
         try {
             workbook = converter.createWorkbook(new FileInputStream(file));
             assertTrue(workbook instanceof HSSFWorkbook);
             assertEquals(expectedSheet, workbook.getNumberOfSheets());
             assertEquals(expectedRowInFirstSheet, workbook.getSheetAt(firstSheetIndex).getPhysicalNumberOfRows());
-        } catch (IOException exception) {
+        } catch (IOException | InvalidDocumentException exception) {
             exception.printStackTrace();
         }
         assertNotNull(workbook);
@@ -46,19 +48,28 @@ public class CSVConverterTest {
     public void should_read_workbook_as_xssfWorkbook() {
         int expectedSheet = 1;
         int firstSheetIndex = 0;
-        int expectedRowInFirstSheet = 501;
-        String fileName = "one-sheet-no-formula-972003.xls";
+        int expectedRowInFirstSheet = 10;
+        String fileName = "one-sheet-no-formula-2007.xlsx";
         File file = new File(Objects.requireNonNull(getClass().getClassLoader().getResource(fileName)).getFile());
-        assertNotNull(file);
+
         Workbook workbook = null;
         try {
             workbook = converter.createWorkbook(new FileInputStream(file));
-            assertTrue(workbook instanceof HSSFWorkbook);
+
+            assertTrue(workbook instanceof XSSFWorkbook);
             assertEquals(expectedSheet, workbook.getNumberOfSheets());
             assertEquals(expectedRowInFirstSheet, workbook.getSheetAt(firstSheetIndex).getPhysicalNumberOfRows());
-        } catch (IOException exception) {
+        } catch (IOException | InvalidDocumentException exception) {
             exception.printStackTrace();
         }
         assertNotNull(workbook);
+    }
+
+    @Test
+    public void should_not_read_as_work_book() {
+        String fileName = "not-a-workbook.xls";
+        File file = new File(Objects.requireNonNull(getClass().getClassLoader().getResource(fileName)).getFile());
+
+        assertThrows(InvalidDocumentException.class, () -> converter.createWorkbook(new FileInputStream(file)));
     }
 }
