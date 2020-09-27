@@ -18,6 +18,7 @@ package com.ifi.processors.csv;
 
 import com.ifi.util.CSVConverter;
 import com.ifi.util.CSVConverterImp;
+import com.ifi.util.EscapeChar;
 import com.ifi.util.exception.InvalidDocumentException;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.nifi.annotation.behavior.ReadsAttribute;
@@ -47,6 +48,8 @@ import java.util.*;
 @ReadsAttributes({@ReadsAttribute(attribute = "", description = "")})
 @WritesAttributes({@WritesAttribute(attribute = "", description = "")})
 public class ExcelToCsv extends AbstractProcessor {
+    static final String UNIX_SYSTEM = "Unix";
+    static final String WINDOWS_SYSTEM = "Windows";
     static final String CSV_MIME_TYPE = "text/csv";
     static final String SHEET_NAME_SEPARATOR = "-";
     static final String CSV_EXTENSION = ".csv";
@@ -65,6 +68,15 @@ public class ExcelToCsv extends AbstractProcessor {
             .description("Should the csv file be encoded in UTF-8 charset")
             .allowableValues("true", "false")
             .defaultValue("false")
+            .required(true)
+            .build();
+
+    public static final PropertyDescriptor ESCAPE_CONVENTION = new PropertyDescriptor
+            .Builder().name("escape-convention")
+            .displayName("Escape Convention")
+            .description("Choose operating system that special character should be escaped")
+            .allowableValues(UNIX_SYSTEM, WINDOWS_SYSTEM)
+            .defaultValue("Windows")
             .required(true)
             .build();
 
@@ -91,6 +103,7 @@ public class ExcelToCsv extends AbstractProcessor {
     protected void init(final ProcessorInitializationContext context) {
         final List<PropertyDescriptor> descriptors = new ArrayList<>();
         descriptors.add(UTF8_ENCODED);
+        descriptors.add(ESCAPE_CONVENTION);
         this.descriptors = Collections.unmodifiableList(descriptors);
 
         final Set<Relationship> relationships = new HashSet<>();
@@ -114,8 +127,15 @@ public class ExcelToCsv extends AbstractProcessor {
     public void onScheduled(final ProcessContext context) {
         logger = getLogger();
         logger.info("Processor Started!");
+
         utf8Encoded = context.getProperty(UTF8_ENCODED).asBoolean();
-        converter = new CSVConverterImp();
+        EscapeChar escapeChar = EscapeChar.EXCEL_STYLE_ESCAPING;
+        String convention = context.getProperty(ESCAPE_CONVENTION).getValue();
+        if (convention.equals(UNIX_SYSTEM)) {
+            escapeChar = EscapeChar.UNIX_STYLE_ESCAPING;
+        }
+
+        converter = new CSVConverterImp(escapeChar);
     }
 
     @Override

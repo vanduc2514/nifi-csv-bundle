@@ -27,6 +27,10 @@ public class CSVConverterImp implements CSVConverter {
         this.escapeChar = escapeChar;
     }
 
+    public CSVConverterImp(EscapeChar escapeChar) {
+        this.escapeChar = escapeChar;
+    }
+
     public Workbook createWorkbook(InputStream inputStream) throws IOException, InvalidDocumentException, EncryptedDocumentException {
         Workbook workbook;
         try {
