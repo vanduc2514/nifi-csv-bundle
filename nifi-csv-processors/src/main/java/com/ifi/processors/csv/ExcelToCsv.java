@@ -150,13 +150,13 @@ public class ExcelToCsv extends AbstractProcessor {
     @OnScheduled
     public void onScheduled(final ProcessContext context) {
         logger = getLogger();
-        logger.info("Processor Started!");
         utf8Encoded = context.getProperty(UTF8_ENCODED).asBoolean();
         String delimiterSheetName;
         if ((delimiterSheetName = context.getProperty(EXTRACT_SHEETS).getValue()) != null) {
             extractSheets = delimiterSheetName.split(SHEET_NAME_DELIMITER);
         }
         setupConverter(context);
+        logger.info("Processor Started!");
     }
 
     private void setupConverter(ProcessContext context) {
@@ -177,44 +177,54 @@ public class ExcelToCsv extends AbstractProcessor {
             return;
         }
 
-        session.read(excelFile, inputStream -> {
-            try {
-                Workbook workbook = converter.createWorkbook(inputStream);
-                if (extractSheets != null) {
-                    for (String sheetName : extractSheets) {
-                        Sheet sheet = workbook.getSheet(sheetName);
-                        if (sheet != null) {
-                            handleCSVData(session, excelFile, sheet);
-                        } else {
-                            session.transfer(excelFile, FAILURE);
+        try {
+            session.read(excelFile, inputStream -> {
+                try {
+                    Workbook workbook = converter.createWorkbook(inputStream);
+                    if (extractSheets != null) {
+                        logger.info("Export csv by sheet name");
+                        for (String sheetName : extractSheets) {
+                            Sheet sheet = workbook.getSheet(sheetName);
+                            if (sheet != null) {
+                                transformSheetToCSV(session, excelFile, sheet);
+                            } else {
+                                logger.debug(String.format("Sheet %s not found", sheetName));
+                            }
+                        }
+                    } else {
+                        logger.info("Export all sheet in workbook to csv");
+                        for (int i = 0; i < workbook.getNumberOfSheets(); i++) {
+                            Sheet sheet = workbook.getSheetAt(i);
+                            transformSheetToCSV(session, excelFile, sheet);
                         }
                     }
-                } else {
-                    for (int i = 0; i < workbook.getNumberOfSheets(); i++) {
-                        Sheet sheet = workbook.getSheetAt(i);
-                        if (sheet != null) {
-                            handleCSVData(session, excelFile, sheet);
-                        } else {
-                            session.transfer(excelFile, FAILURE);
-                        }
-                    }
+                    logger.info("Finish Processed Excel File");
+                } catch (InvalidDocumentException exception) {
+                    FlowFile failedFlowFile = session.putAttribute(excelFile,
+                            ExcelToCsv.class.getName() + ".error", exception.getMessage());
+                    session.transfer(failedFlowFile, FAILURE);
+                    logger.error("This File is not a Excel Work Book. Only .xls and .xlsx is supported", exception);
+                } finally {
+                    inputStream.close();
                 }
-            } catch (InvalidDocumentException e) {
-                session.transfer(excelFile, FAILURE);
-            } finally {
-                inputStream.close();
-            }
-        });
+            });
 
-        session.transfer(excelFile, ORIGINAL);
+            session.transfer(excelFile, ORIGINAL);
+
+        } catch (RuntimeException exception) {
+            FlowFile failedFlowFile = session.putAttribute(excelFile,
+                    ExcelToCsv.class.getName() + ".error", exception.getMessage());
+            session.transfer(failedFlowFile, FAILURE);
+            getLogger().error("Failed to process incoming Excel document. " + exception.getMessage(), exception);
+        }
     }
 
-    private void handleCSVData(ProcessSession session, FlowFile excelFile, Sheet sheet) {
+    private void transformSheetToCSV(ProcessSession session, FlowFile excelFile, Sheet sheet) {
         String csvData = converter.toCSVFormat(sheet);
-        handleCSVData(session, excelFile, sheet, csvData);
+        transformSheetToCSV(session, excelFile, sheet, csvData);
     }
 
-    private void handleCSVData(ProcessSession session, FlowFile excelFile, Sheet sheet, String csvData) {
+    private void transformSheetToCSV(ProcessSession session, FlowFile excelFile, Sheet sheet, String csvData) {
         FlowFile csvFile = session.create(excelFile);
         csvFile = session.write(csvFile, outputStream -> {
             if (utf8Encoded) {
@@ -236,6 +246,7 @@ public class ExcelToCsv extends AbstractProcessor {
                         getCSVFileName(sourceFileName, sheet.getSheetName()) :
                         csvFile.getAttribute(CoreAttributes.UUID.key()) + CSV_EXTENSION);
         session.transfer(csvFile, SUCCESS);
+        logger.info("csv File transferred");
     }
 
     private String getCSVFileName(String sourceFileName, String sheetName) {
