@@ -9,19 +9,22 @@ import java.io.IOException;
 import java.io.InputStream;
 
 public class CSVConverterImp implements CSVConverter {
-    private static final int EXCEL_STYLE_ESCAPING = 0; //TODO
     private String delimiter = ",";
-    private String asNullValue = "";
+    private final String EMPTY_STRING = "";
     private FormulaEvaluator evaluator;
     private DataFormatter formatter;
-    private int formattingConvention = 0; //TODO
+    private EscapeChar escapeChar = EscapeChar.EXCEL_STYLE_ESCAPING;
 
     public CSVConverterImp() {
     }
 
-    public CSVConverterImp(String delimiter, String asNullValue) {
+    public CSVConverterImp(String delimiter) {
         this.delimiter = delimiter;
-        this.asNullValue = asNullValue;
+    }
+
+    public CSVConverterImp(String delimiter, EscapeChar escapeChar) {
+        this.delimiter = delimiter;
+        this.escapeChar = escapeChar;
     }
 
     public Workbook createWorkbook(InputStream inputStream) throws IOException, InvalidDocumentException, EncryptedDocumentException {
@@ -39,7 +42,7 @@ public class CSVConverterImp implements CSVConverter {
     public String toCSVFormat(Sheet sheet) {
         StringBuilder builder = new StringBuilder();
         if (sheet.getPhysicalNumberOfRows() <= 0) {
-            return asNullValue;
+            return EMPTY_STRING;
         }
         int lastRowNum = sheet.getLastRowNum();
         for (int j = 0; j <= lastRowNum; j++) {
@@ -56,7 +59,7 @@ public class CSVConverterImp implements CSVConverter {
         Cell cell;
         int lastCellNum;
         if (row == null) {
-            return asNullValue;
+            return EMPTY_STRING;
         }
         lastCellNum = row.getLastCellNum();
         for (int i = 0; i < lastCellNum; i++) {
@@ -77,7 +80,7 @@ public class CSVConverterImp implements CSVConverter {
 
     private String escapeEmbeddedCharacters(String fieldData) {
         StringBuilder builder;
-        if (this.formattingConvention == CSVConverterImp.EXCEL_STYLE_ESCAPING) {
+        if (this.escapeChar == EscapeChar.EXCEL_STYLE_ESCAPING) {
             if (fieldData.contains("\"")) {
                 builder = new StringBuilder(fieldData.replaceAll("\"", "\\\"\\\""));
                 builder.insert(0, "\"");
@@ -91,13 +94,15 @@ public class CSVConverterImp implements CSVConverter {
                 }
             }
             return builder.toString();
-        } else {
+        } else if (escapeChar == EscapeChar.UNIX_STYLE_ESCAPING) {
             if (fieldData.contains(this.delimiter)) {
                 fieldData = fieldData.replaceAll(this.delimiter, ("\\\\" + this.delimiter));
             }
             if (fieldData.contains("\n")) {
                 fieldData = fieldData.replaceAll("\n", "\\\\\n");
             }
+            return (fieldData);
+        } else {
             return (fieldData);
         }
     }
