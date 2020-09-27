@@ -33,6 +33,7 @@ import org.apache.nifi.flowfile.attributes.CoreAttributes;
 import org.apache.nifi.logging.ComponentLog;
 import org.apache.nifi.processor.*;
 import org.apache.nifi.processor.exception.ProcessException;
+import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 
 import java.io.PrintStream;
@@ -67,6 +68,11 @@ public class ExcelToCsv extends AbstractProcessor {
             .description("Excel files that can't be converted to CSV are transferred to this relationship")
             .build();
 
+    public static final Relationship ORIGINAL = new Relationship.Builder()
+            .name("original")
+            .description("Original Excel Files are transferred to this relationship")
+            .build();
+
     private List<PropertyDescriptor> descriptors;
 
     private Set<Relationship> relationships;
@@ -80,6 +86,7 @@ public class ExcelToCsv extends AbstractProcessor {
         final Set<Relationship> relationships = new HashSet<>();
         relationships.add(SUCCESS);
         relationships.add(FAILURE);
+        relationships.add(ORIGINAL);
         this.relationships = Collections.unmodifiableSet(relationships);
     }
 
@@ -103,25 +110,46 @@ public class ExcelToCsv extends AbstractProcessor {
     @Override
     public void onTrigger(final ProcessContext context, final ProcessSession session) throws ProcessException {
         logger.info("Processor Triggered!");
-        FlowFile excelFormat = session.get();
-        if (excelFormat == null) {
+        FlowFile excelFile = session.get();
+        if (excelFile == null) {
             return;
         }
-        FlowFile csvFormat = session.write(excelFormat, (inputStream, outputStream) -> {
+
+        session.read(excelFile, inputStream -> {
             try {
                 Workbook workbook = converter.createWorkbook(inputStream);
-                String csvData = converter.toCSVFormat(workbook.getSheetAt(0));
-                PrintStream printStream = new PrintStream(outputStream);
-                byte[] bom = {(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
-                printStream.write(bom);
-                printStream.print(csvData);
-                printStream.flush();
-                printStream.close();
+                for (int i = 0; i < workbook.getNumberOfSheets(); i++) {
+                    Sheet sheet = workbook.getSheetAt(i);
+                    String csvData = converter.toCSVFormat(sheet);
+
+                    FlowFile csvFile = session.create(excelFile);
+                    csvFile = session.write(csvFile, outputStream -> {
+                        PrintStream printStream = new PrintStream(outputStream);
+                        byte[] bom = {(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
+                        printStream.write(bom);
+                        printStream.print(csvData);
+                        printStream.close();
+                    });
+
+                    String sourceName = excelFile.getAttribute(CoreAttributes.FILENAME.key());
+                    csvFile = session.putAttribute(csvFile, "sheet name", sheet.getSheetName());
+                    csvFile = session.putAttribute(csvFile, "row num", String.valueOf(sheet.getPhysicalNumberOfRows()));
+                    csvFile = session.putAttribute(csvFile, "source name", sourceName);
+                    csvFile = session.putAttribute(csvFile, CoreAttributes.MIME_TYPE.key(), "text/csv");
+                    csvFile = session.putAttribute(csvFile, CoreAttributes.FILENAME.key(), getCSVFileName(sheet.getSheetName(), sourceName));
+                    session.transfer(csvFile, SUCCESS);
+                }
             } catch (InvalidDocumentException e) {
-                session.transfer(excelFormat, FAILURE);
+                session.transfer(excelFile, FAILURE);
             }
         });
-        csvFormat = session.putAttribute(csvFormat, CoreAttributes.FILENAME.key(), "data.csv");
-        session.transfer(csvFormat, SUCCESS);
+
+        session.transfer(excelFile, ORIGINAL);
+    }
+
+    private String getCSVFileName(String sourceFileName, String sheetName) {
+        String CSV_EXTENSION = ".csv";
+        String SHEET_NAME_SEPARATOR = "-";
+        return sourceFileName.substring(0, sourceFileName.lastIndexOf(".")) + SHEET_NAME_SEPARATOR + sheetName + CSV_EXTENSION;
     }
 }
