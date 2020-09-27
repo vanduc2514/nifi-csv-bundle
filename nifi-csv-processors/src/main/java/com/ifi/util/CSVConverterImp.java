@@ -46,6 +46,7 @@ public class CSVConverterImp implements CSVConverter {
             Row row = sheet.getRow(j);
             String csvLine = this.rowToCSVFormat(row);
             builder.append(csvLine);
+            builder.append("\n");
         }
         return builder.toString();
     }
@@ -58,7 +59,7 @@ public class CSVConverterImp implements CSVConverter {
             return asNullValue;
         }
         lastCellNum = row.getLastCellNum();
-        for (int i = 0; i <= lastCellNum; i++) {
+        for (int i = 0; i < lastCellNum; i++) {
             cell = row.getCell(i);
             String fieldData;
             if (cell.getCellType() != CellType.FORMULA) {
@@ -67,7 +68,9 @@ public class CSVConverterImp implements CSVConverter {
                 fieldData = this.formatter.formatCellValue(cell, this.evaluator);
             }
             builder.append(escapeEmbeddedCharacters(fieldData));
-            builder.append(delimiter);
+            if (i != lastCellNum - 1) {
+                builder.append(delimiter);
+            }
         }
         return builder.toString();
     }

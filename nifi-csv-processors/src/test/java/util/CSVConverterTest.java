@@ -4,6 +4,7 @@ import com.ifi.util.CSVConverter;
 import com.ifi.util.CSVConverterImp;
 import com.ifi.util.exception.InvalidDocumentException;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.Before;
@@ -80,7 +81,28 @@ public class CSVConverterTest {
     }
 
     @Test
-    public void should_convert_xssf_to_csv() {
+    public void should_convert_hssf_to_csv() {
+        try {
+            Workbook workbook = converter.createWorkbook(new FileInputStream(hssfWorkBookFile));
+            for (int i = 0; i < workbook.getNumberOfSheets(); i++) {
+                String result = converter.toCSVFormat(workbook.getSheetAt(i));
+                assertNotNull(result);
+            }
+        } catch (IOException | InvalidDocumentException exception) {
+            exception.printStackTrace();
+        }
+    }
 
+    @Test
+    public void should_convert_xssf_to_csv() {
+        try {
+            Workbook workbook = converter.createWorkbook(new FileInputStream(xssfWorkBookFile));
+            for (int i = 0; i < workbook.getNumberOfSheets(); i++) {
+                String result = converter.toCSVFormat(workbook.getSheetAt(i));
+                assertNotNull(result);
+            }
+        } catch (IOException | InvalidDocumentException exception) {
+            exception.printStackTrace();
+        }
     }
 }
