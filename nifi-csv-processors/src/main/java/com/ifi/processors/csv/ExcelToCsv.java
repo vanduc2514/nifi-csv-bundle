@@ -16,6 +16,9 @@
  */
 package com.ifi.processors.csv;
 
+import com.ifi.util.CSVConverter;
+import com.ifi.util.CSVConverterImp;
+import com.ifi.util.exception.InvalidDocumentException;
 import org.apache.nifi.annotation.behavior.ReadsAttribute;
 import org.apache.nifi.annotation.behavior.ReadsAttributes;
 import org.apache.nifi.annotation.behavior.WritesAttribute;
@@ -26,16 +29,17 @@ import org.apache.nifi.annotation.documentation.Tags;
 import org.apache.nifi.annotation.lifecycle.OnScheduled;
 import org.apache.nifi.components.PropertyDescriptor;
 import org.apache.nifi.flowfile.FlowFile;
+import org.apache.nifi.flowfile.attributes.CoreAttributes;
 import org.apache.nifi.logging.ComponentLog;
 import org.apache.nifi.processor.*;
 import org.apache.nifi.processor.exception.ProcessException;
-import org.apache.nifi.processor.io.InputStreamCallback;
-import org.apache.poi.util.IOUtils;
+import org.apache.poi.ss.usermodel.Workbook;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.*;
+import java.io.PrintStream;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 @Tags({"excel, csv"})
 @CapabilityDescription("Processor to convert Excel to CSV")
@@ -44,6 +48,7 @@ import java.util.*;
 @WritesAttributes({@WritesAttribute(attribute = "", description = "")})
 public class ExcelToCsv extends AbstractProcessor {
     private ComponentLog logger;
+    private CSVConverter converter;
 //    public static final PropertyDescriptor PROCESSOR_PROPERTY = new PropertyDescriptor
 //            .Builder().name("MY_PROPERTY")
 //            .displayName("My property")
@@ -92,20 +97,31 @@ public class ExcelToCsv extends AbstractProcessor {
     public void onScheduled(final ProcessContext context) {
         logger = getLogger();
         logger.info("Processor Started!");
+        converter = new CSVConverterImp();
     }
 
     @Override
     public void onTrigger(final ProcessContext context, final ProcessSession session) throws ProcessException {
         logger.info("Processor Triggered!");
-        FlowFile flowFile = session.get();
-        if (flowFile == null) {
+        FlowFile excelFormat = session.get();
+        if (excelFormat == null) {
             return;
         }
-        session.read(flowFile, new InputStreamCallback() {
-            @Override
-            public void process(InputStream inputStream) throws IOException {
+        FlowFile csvFormat = session.write(excelFormat, (inputStream, outputStream) -> {
+            try {
+                Workbook workbook = converter.createWorkbook(inputStream);
+                String csvData = converter.toCSVFormat(workbook.getSheetAt(0));
+                PrintStream printStream = new PrintStream(outputStream);
+                byte[] bom = {(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
+                printStream.write(bom);
+                printStream.print(csvData);
+                printStream.flush();
+                printStream.close();
+            } catch (InvalidDocumentException e) {
+                session.transfer(excelFormat, FAILURE);
             }
         });
-        session.transfer(flowFile, SUCCESS);
+        csvFormat = session.putAttribute(csvFormat, CoreAttributes.FILENAME.key(), "data.csv");
+        session.transfer(csvFormat, SUCCESS);
     }
 }
