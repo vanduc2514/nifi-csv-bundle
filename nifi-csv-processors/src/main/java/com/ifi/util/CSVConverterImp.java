@@ -61,12 +61,14 @@ public class CSVConverterImp implements CSVConverter {
         for (int i = 0; i < lastCellNum; i++) {
             cell = row.getCell(i, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
             String fieldData;
-            if (cell.getCellType() != CellType.FORMULA) {
-                fieldData = this.formatter.formatCellValue(cell);
-            } else {
-                fieldData = this.formatter.formatCellValue(cell, this.evaluator);
+            if (cell != null) {
+                if (cell.getCellType() != CellType.FORMULA) {
+                    fieldData = this.formatter.formatCellValue(cell);
+                } else {
+                    fieldData = this.formatter.formatCellValue(cell, this.evaluator);
+                }
+                builder.append(escapeEmbeddedCharacters(fieldData));
             }
-            builder.append(escapeEmbeddedCharacters(fieldData));
             if (i != lastCellNum - 1) {
                 builder.append(delimiter);
             }
