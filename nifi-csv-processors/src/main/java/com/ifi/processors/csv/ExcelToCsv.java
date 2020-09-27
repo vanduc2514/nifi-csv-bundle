@@ -152,8 +152,9 @@ public class ExcelToCsv extends AbstractProcessor {
         logger = getLogger();
         logger.info("Processor Started!");
         utf8Encoded = context.getProperty(UTF8_ENCODED).asBoolean();
-        if (context.getProperty(EXTRACT_SHEETS) != null) {
-            extractSheets = context.getProperty(EXTRACT_SHEETS).getValue().split(SHEET_NAME_DELIMITER);
+        String delimiterSheetName;
+        if ((delimiterSheetName = context.getProperty(EXTRACT_SHEETS).getValue()) != null) {
+            extractSheets = delimiterSheetName.split(SHEET_NAME_DELIMITER);
         }
         setupConverter(context);
     }
@@ -200,6 +201,8 @@ public class ExcelToCsv extends AbstractProcessor {
                 }
             } catch (InvalidDocumentException e) {
                 session.transfer(excelFile, FAILURE);
+            } finally {
+                inputStream.close();
             }
         });
 
@@ -220,6 +223,7 @@ public class ExcelToCsv extends AbstractProcessor {
             } else {
                 outputStream.write(csvData.getBytes());
             }
+            outputStream.close();
         });
 
         String sourceFileName = excelFile.getAttribute(CoreAttributes.FILENAME.key());
