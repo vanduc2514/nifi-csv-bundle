@@ -48,6 +48,12 @@ import java.util.Set;
 @ReadsAttributes({@ReadsAttribute(attribute = "", description = "")})
 @WritesAttributes({@WritesAttribute(attribute = "", description = "")})
 public class ExcelToCsv extends AbstractProcessor {
+    static final String CSV_MIME_TYPE = "text/csv";
+    static final String SHEET_NAME_SEPARATOR = "-";
+    static final String CSV_EXTENSION = ".csv";
+    static final String SHEET_NAME_ATT = "sheet name";
+    static final String ROW_NUM_ATT = "row num";
+    static final String SOURCE_NAME_ATT = "source name";
     private ComponentLog logger;
     private CSVConverter converter;
 //    public static final PropertyDescriptor PROCESSOR_PROPERTY = new PropertyDescriptor
@@ -76,6 +82,7 @@ public class ExcelToCsv extends AbstractProcessor {
     private List<PropertyDescriptor> descriptors;
 
     private Set<Relationship> relationships;
+    static final byte[] BYTE_ORDER_MARKER = new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
 
     @Override
     protected void init(final ProcessorInitializationContext context) {
@@ -125,17 +132,16 @@ public class ExcelToCsv extends AbstractProcessor {
                     FlowFile csvFile = session.create(excelFile);
                     csvFile = session.write(csvFile, outputStream -> {
                         PrintStream printStream = new PrintStream(outputStream);
-                        byte[] bom = {(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
-                        printStream.write(bom);
+                        printStream.write(BYTE_ORDER_MARKER);
                         printStream.print(csvData);
                         printStream.close();
                     });
 
                     String sourceName = excelFile.getAttribute(CoreAttributes.FILENAME.key());
-                    csvFile = session.putAttribute(csvFile, "sheet name", sheet.getSheetName());
-                    csvFile = session.putAttribute(csvFile, "row num", String.valueOf(sheet.getPhysicalNumberOfRows()));
-                    csvFile = session.putAttribute(csvFile, "source name", sourceName);
-                    csvFile = session.putAttribute(csvFile, CoreAttributes.MIME_TYPE.key(), "text/csv");
+                    csvFile = session.putAttribute(csvFile, SHEET_NAME_ATT, sheet.getSheetName());
+                    csvFile = session.putAttribute(csvFile, ROW_NUM_ATT, String.valueOf(sheet.getPhysicalNumberOfRows()));
+                    csvFile = session.putAttribute(csvFile, SOURCE_NAME_ATT, sourceName);
+                    csvFile = session.putAttribute(csvFile, CoreAttributes.MIME_TYPE.key(), CSV_MIME_TYPE);
                     csvFile = session.putAttribute(csvFile, CoreAttributes.FILENAME.key(), getCSVFileName(sheet.getSheetName(), sourceName));
                     session.transfer(csvFile, SUCCESS);
                 }
@@ -148,8 +154,6 @@ public class ExcelToCsv extends AbstractProcessor {
     }
 
     private String getCSVFileName(String sourceFileName, String sheetName) {
-        String CSV_EXTENSION = ".csv";
-        String SHEET_NAME_SEPARATOR = "-";
         return sourceFileName.substring(0, sourceFileName.lastIndexOf(".")) + SHEET_NAME_SEPARATOR + sheetName + CSV_EXTENSION;
     }
 }
