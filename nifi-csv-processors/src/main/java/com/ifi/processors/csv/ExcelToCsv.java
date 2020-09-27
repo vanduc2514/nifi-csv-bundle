@@ -80,6 +80,14 @@ public class ExcelToCsv extends AbstractProcessor {
             .required(true)
             .build();
 
+    public static final PropertyDescriptor DELIMITER = new PropertyDescriptor
+            .Builder().name("delimiter")
+            .displayName("Delimiter")
+            .description("Delimiter use in csv")
+            .defaultValue(",")
+            .required(true)
+            .build();
+
     public static final Relationship SUCCESS = new Relationship.Builder()
             .name("success")
             .description("Excel files that have been successfully converted to CSV are transferred to this relationship")
@@ -104,6 +112,7 @@ public class ExcelToCsv extends AbstractProcessor {
         final List<PropertyDescriptor> descriptors = new ArrayList<>();
         descriptors.add(UTF8_ENCODED);
         descriptors.add(ESCAPE_CONVENTION);
+        descriptors.add(DELIMITER);
         this.descriptors = Collections.unmodifiableList(descriptors);
 
         final Set<Relationship> relationships = new HashSet<>();
@@ -129,13 +138,14 @@ public class ExcelToCsv extends AbstractProcessor {
         logger.info("Processor Started!");
 
         utf8Encoded = context.getProperty(UTF8_ENCODED).asBoolean();
+
         EscapeChar escapeChar = EscapeChar.EXCEL_STYLE_ESCAPING;
         String convention = context.getProperty(ESCAPE_CONVENTION).getValue();
         if (convention.equals(UNIX_SYSTEM)) {
             escapeChar = EscapeChar.UNIX_STYLE_ESCAPING;
         }
-
-        converter = new CSVConverterImp(escapeChar);
+        String delimiter = context.getProperty(DELIMITER).getValue();
+        converter = new CSVConverterImp(delimiter, escapeChar);
     }
 
     @Override
