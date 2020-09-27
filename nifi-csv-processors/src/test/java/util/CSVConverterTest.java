@@ -18,8 +18,8 @@ import static org.junit.Assert.*;
 
 public class CSVConverterTest {
     private CSVConverter converter;
-    private static File hssfWorkBookFile;
-    private static File xssfWorkBookFile;
+    private static final File hssfWorkBookFile;
+    private static final File xssfWorkBookFile;
 
     static {
         hssfWorkBookFile = new File(Objects.requireNonNull(CSVConverterTest.class.getClassLoader().getResource(
