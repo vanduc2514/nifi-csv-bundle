@@ -60,7 +60,7 @@ public class CSVConverterImp implements CSVConverter {
         }
         lastCellNum = row.getLastCellNum();
         for (int i = 0; i < lastCellNum; i++) {
-            cell = row.getCell(i);
+            cell = row.getCell(i, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
             String fieldData;
             if (cell.getCellType() != CellType.FORMULA) {
                 fieldData = this.formatter.formatCellValue(cell);
