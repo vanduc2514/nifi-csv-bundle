@@ -18,16 +18,8 @@ public class CSVConverterImp implements CSVConverter {
     public CSVConverterImp() {
     }
 
-    public CSVConverterImp(String delimiter) {
-        this.delimiter = delimiter;
-    }
-
     public CSVConverterImp(String delimiter, EscapeChar escapeChar) {
         this.delimiter = delimiter;
-        this.escapeChar = escapeChar;
-    }
-
-    public CSVConverterImp(EscapeChar escapeChar) {
         this.escapeChar = escapeChar;
     }
 

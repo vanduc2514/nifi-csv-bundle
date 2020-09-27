@@ -48,6 +48,9 @@ import java.util.*;
 @ReadsAttributes({@ReadsAttribute(attribute = "", description = "")})
 @WritesAttributes({@WritesAttribute(attribute = "", description = "")})
 public class ExcelToCsv extends AbstractProcessor {
+    private List<PropertyDescriptor> descriptors;
+    private Set<Relationship> relationships;
+
     static final String UNIX_SYSTEM = "Unix";
     static final String WINDOWS_SYSTEM = "Windows";
     static final String CSV_MIME_TYPE = "text/csv";
@@ -90,22 +93,18 @@ public class ExcelToCsv extends AbstractProcessor {
 
     public static final Relationship SUCCESS = new Relationship.Builder()
             .name("success")
-            .description("Excel files that have been successfully converted to CSV are transferred to this relationship")
+            .description("Excel files that have been successfully converted to csv are transferred to this relationship")
             .build();
 
     public static final Relationship FAILURE = new Relationship.Builder()
             .name("failure")
-            .description("Excel files that can't be converted to CSV are transferred to this relationship")
+            .description("Excel files that can't be converted to csv are transferred to this relationship")
             .build();
 
     public static final Relationship ORIGINAL = new Relationship.Builder()
             .name("original")
             .description("Original Excel Files are transferred to this relationship")
             .build();
-
-    private List<PropertyDescriptor> descriptors;
-
-    private Set<Relationship> relationships;
 
     @Override
     protected void init(final ProcessorInitializationContext context) {
@@ -136,9 +135,11 @@ public class ExcelToCsv extends AbstractProcessor {
     public void onScheduled(final ProcessContext context) {
         logger = getLogger();
         logger.info("Processor Started!");
-
         utf8Encoded = context.getProperty(UTF8_ENCODED).asBoolean();
+        setupConverter(context);
+    }
 
+    private void setupConverter(ProcessContext context) {
         EscapeChar escapeChar = EscapeChar.EXCEL_STYLE_ESCAPING;
         String convention = context.getProperty(ESCAPE_CONVENTION).getValue();
         if (convention.equals(UNIX_SYSTEM)) {
@@ -162,27 +163,7 @@ public class ExcelToCsv extends AbstractProcessor {
                 for (int i = 0; i < workbook.getNumberOfSheets(); i++) {
                     Sheet sheet = workbook.getSheetAt(i);
                     String csvData = converter.toCSVFormat(sheet);
-
-                    FlowFile csvFile = session.create(excelFile);
-                    csvFile = session.write(csvFile, outputStream -> {
-                        if (utf8Encoded) {
-                            outputStream.write(BYTE_ORDER_MARKER);
-                            outputStream.write(csvData.getBytes(StandardCharsets.UTF_8));
-                        } else {
-                            outputStream.write(csvData.getBytes());
-                        }
-                    });
-
-                    String sourceFileName = excelFile.getAttribute(CoreAttributes.FILENAME.key());
-                    csvFile = session.putAttribute(csvFile, SHEET_NAME_ATT, sheet.getSheetName());
-                    csvFile = session.putAttribute(csvFile, ROW_NUM_ATT, String.valueOf(sheet.getPhysicalNumberOfRows()));
-                    csvFile = session.putAttribute(csvFile, SOURCE_NAME_ATT, sourceFileName);
-                    csvFile = session.putAttribute(csvFile, CoreAttributes.MIME_TYPE.key(), CSV_MIME_TYPE);
-                    csvFile = session.putAttribute(csvFile, CoreAttributes.FILENAME.key(),
-                            StringUtils.isNotEmpty(sourceFileName) ?
-                                    getCSVFileName(sourceFileName, sheet.getSheetName()) :
-                                    csvFile.getAttribute(CoreAttributes.UUID.key()) + CSV_EXTENSION);
-                    session.transfer(csvFile, SUCCESS);
+                    handleCSVData(session, excelFile, sheet, csvData);
                 }
             } catch (InvalidDocumentException e) {
                 session.transfer(excelFile, FAILURE);
@@ -190,6 +171,29 @@ public class ExcelToCsv extends AbstractProcessor {
         });
 
         session.transfer(excelFile, ORIGINAL);
+    }
+
+    private void handleCSVData(ProcessSession session, FlowFile excelFile, Sheet sheet, String csvData) {
+        FlowFile csvFile = session.create(excelFile);
+        csvFile = session.write(csvFile, outputStream -> {
+            if (utf8Encoded) {
+                outputStream.write(BYTE_ORDER_MARKER);
+                outputStream.write(csvData.getBytes(StandardCharsets.UTF_8));
+            } else {
+                outputStream.write(csvData.getBytes());
+            }
+        });
+
+        String sourceFileName = excelFile.getAttribute(CoreAttributes.FILENAME.key());
+        csvFile = session.putAttribute(csvFile, SHEET_NAME_ATT, sheet.getSheetName());
+        csvFile = session.putAttribute(csvFile, ROW_NUM_ATT, String.valueOf(sheet.getPhysicalNumberOfRows()));
+        csvFile = session.putAttribute(csvFile, SOURCE_NAME_ATT, sourceFileName);
+        csvFile = session.putAttribute(csvFile, CoreAttributes.MIME_TYPE.key(), CSV_MIME_TYPE);
+        csvFile = session.putAttribute(csvFile, CoreAttributes.FILENAME.key(),
+                StringUtils.isNotEmpty(sourceFileName) ?
+                        getCSVFileName(sourceFileName, sheet.getSheetName()) :
+                        csvFile.getAttribute(CoreAttributes.UUID.key()) + CSV_EXTENSION);
+        session.transfer(csvFile, SUCCESS);
     }
 
     private String getCSVFileName(String sourceFileName, String sheetName) {
