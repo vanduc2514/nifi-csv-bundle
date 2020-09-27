@@ -72,4 +72,9 @@ public class CSVConverterTest {
 
         assertThrows(InvalidDocumentException.class, () -> converter.createWorkbook(new FileInputStream(file)));
     }
+
+    @Test
+    public void should_convert_xssf_to_csv() {
+
+    }
 }
