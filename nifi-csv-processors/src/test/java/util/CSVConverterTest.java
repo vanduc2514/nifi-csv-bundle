@@ -18,6 +18,16 @@ import static org.junit.Assert.*;
 
 public class CSVConverterTest {
     private CSVConverter converter;
+    private static File hssfWorkBookFile;
+    private static File xssfWorkBookFile;
+
+    static {
+        hssfWorkBookFile = new File(Objects.requireNonNull(CSVConverterTest.class.getClassLoader().getResource(
+                "one-sheet-no-formula-972003.xls")).getFile());
+        xssfWorkBookFile = new File(Objects.requireNonNull(CSVConverterTest.class.getClassLoader().getResource(
+                "one-sheet-no-formula-2007.xlsx")).getFile());
+
+    }
 
     @Before
     public void setUp() {
@@ -29,12 +39,10 @@ public class CSVConverterTest {
         int expectedSheet = 1;
         int firstSheetIndex = 0;
         int expectedRowInFirstSheet = 501;
-        String fileName = "one-sheet-no-formula-972003.xls";
-        File file = new File(Objects.requireNonNull(getClass().getClassLoader().getResource(fileName)).getFile());
 
         Workbook workbook = null;
         try {
-            workbook = converter.createWorkbook(new FileInputStream(file));
+            workbook = converter.createWorkbook(new FileInputStream(hssfWorkBookFile));
             assertTrue(workbook instanceof HSSFWorkbook);
             assertEquals(expectedSheet, workbook.getNumberOfSheets());
             assertEquals(expectedRowInFirstSheet, workbook.getSheetAt(firstSheetIndex).getPhysicalNumberOfRows());
@@ -49,12 +57,10 @@ public class CSVConverterTest {
         int expectedSheet = 1;
         int firstSheetIndex = 0;
         int expectedRowInFirstSheet = 10;
-        String fileName = "one-sheet-no-formula-2007.xlsx";
-        File file = new File(Objects.requireNonNull(getClass().getClassLoader().getResource(fileName)).getFile());
 
         Workbook workbook = null;
         try {
-            workbook = converter.createWorkbook(new FileInputStream(file));
+            workbook = converter.createWorkbook(new FileInputStream(xssfWorkBookFile));
 
             assertTrue(workbook instanceof XSSFWorkbook);
             assertEquals(expectedSheet, workbook.getNumberOfSheets());
