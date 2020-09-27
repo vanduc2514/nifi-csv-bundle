@@ -38,11 +38,8 @@ import org.apache.nifi.util.StringUtils;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 
-import java.io.PrintStream;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
 
 @Tags({"excel, csv"})
 @CapabilityDescription("Processor to convert Excel to CSV")
@@ -56,17 +53,20 @@ public class ExcelToCsv extends AbstractProcessor {
     static final String SHEET_NAME_ATT = "sheet name";
     static final String ROW_NUM_ATT = "row num";
     static final String SOURCE_NAME_ATT = "source name";
-    static final byte[] BYTE_ORDER_MARKER = new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
+    static final byte[] BYTE_ORDER_MARKER = {(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
 
     private ComponentLog logger;
     private CSVConverter converter;
-//    public static final PropertyDescriptor PROCESSOR_PROPERTY = new PropertyDescriptor
-//            .Builder().name("MY_PROPERTY")
-//            .displayName("My property")
-//            .description("Example Property")
-//            .required(true)
-//            .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
-//            .build();
+    private boolean utf8Encoded;
+
+    public static final PropertyDescriptor UTF8_ENCODED = new PropertyDescriptor
+            .Builder().name("utf8-encoded")
+            .displayName("UTF-8 Encode")
+            .description("Should the csv file be encoded in UTF-8 charset")
+            .allowableValues("true", "false")
+            .defaultValue("false")
+            .required(true)
+            .build();
 
     public static final Relationship SUCCESS = new Relationship.Builder()
             .name("success")
@@ -89,9 +89,9 @@ public class ExcelToCsv extends AbstractProcessor {
 
     @Override
     protected void init(final ProcessorInitializationContext context) {
-//        final List<PropertyDescriptor> descriptors = new ArrayList<>();
-//        descriptors.add(PROCESSOR_PROPERTY);
-//        this.descriptors = Collections.unmodifiableList(descriptors);
+        final List<PropertyDescriptor> descriptors = new ArrayList<>();
+        descriptors.add(UTF8_ENCODED);
+        this.descriptors = Collections.unmodifiableList(descriptors);
 
         final Set<Relationship> relationships = new HashSet<>();
         relationships.add(SUCCESS);
@@ -114,6 +114,7 @@ public class ExcelToCsv extends AbstractProcessor {
     public void onScheduled(final ProcessContext context) {
         logger = getLogger();
         logger.info("Processor Started!");
+        utf8Encoded = context.getProperty(UTF8_ENCODED).asBoolean();
         converter = new CSVConverterImp();
     }
 
@@ -134,10 +135,12 @@ public class ExcelToCsv extends AbstractProcessor {
 
                     FlowFile csvFile = session.create(excelFile);
                     csvFile = session.write(csvFile, outputStream -> {
-                        PrintStream printStream = new PrintStream(outputStream);
-                        printStream.write(BYTE_ORDER_MARKER);
-                        printStream.print(csvData);
-                        printStream.close();
+                        if (utf8Encoded) {
+                            outputStream.write(BYTE_ORDER_MARKER);
+                            outputStream.write(csvData.getBytes(StandardCharsets.UTF_8));
+                        } else {
+                            outputStream.write(csvData.getBytes());
+                        }
                     });
 
                     String sourceFileName = excelFile.getAttribute(CoreAttributes.FILENAME.key());
